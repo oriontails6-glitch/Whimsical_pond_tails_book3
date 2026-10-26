@@ -123,17 +123,20 @@ body {
 }
 
 .nav-arrow {
+  position: relative;
+  z-index: 50;
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
   border-radius: 50%;
   border: none;
-  background: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.92);
   color: var(--accent-dark);
   font-size: 18px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.14);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
   transition: transform 0.15s ease, background 0.15s ease;
+  user-select: none;
 }
 .nav-arrow:hover {
   background: #fff;

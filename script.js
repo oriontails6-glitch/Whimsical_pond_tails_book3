@@ -15,13 +15,13 @@ document.addEventListener('DOMContentLoaded', function () {
     usePortrait: true,
     mobileScrollSupport: true,
     swipeDistance: 45,
-    clickEventForward: false,
-    disableFlipByClick: true,
-    flippingTime: 650,
+    clickEventForward: true,
+    flippingTime: 600,
     useMouseEvents: true
   });
 
   pageFlip.loadFromHTML(pages);
+  window.pageFlip = pageFlip;
 
   const totalPages = pageFlip.getPageCount();
   const indicator = document.getElementById('pageIndicator');
@@ -38,10 +38,47 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   pageFlip.on('flip', updateIndicator);
+  pageFlip.on('changeState', function (state) {
+    if (state === 'read') updateIndicator();
+  });
   updateIndicator();
 
-  function goNext() { pageFlip.flipNext(); }
-  function goPrev() { pageFlip.flipPrev(); }
+  // Prevent scroll events inside page text from breaking flip gestures
+  document.querySelectorAll('.page-body').forEach(el => {
+    ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'pointermove'].forEach(eventType => {
+      el.addEventListener(eventType, function (e) {
+        e.stopPropagation();
+      }, { passive: true });
+    });
+  });
+
+  function goNext() {
+    const cur = pageFlip.getCurrentPageIndex();
+    if (cur >= totalPages - 1) return;
+    try {
+      pageFlip.flipNext();
+    } catch (e) {
+      pageFlip.turnToNextPage();
+    }
+    setTimeout(updateIndicator, 100);
+  }
+
+  function goPrev() {
+    const cur = pageFlip.getCurrentPageIndex();
+    if (cur <= 0) return;
+    try {
+      // In portrait/single-page mode, StPageFlip's internal flipPrev has a coordinate calculation bug.
+      // turnToPrevPage() flips back smoothly and reliably without failing.
+      if (pageFlip.getOrientation() === 'portrait') {
+        pageFlip.turnToPrevPage();
+      } else {
+        pageFlip.flipPrev();
+      }
+    } catch (e) {
+      pageFlip.turnToPrevPage();
+    }
+    setTimeout(updateIndicator, 100);
+  }
 
   document.getElementById('nextBtn').addEventListener('click', goNext);
   document.getElementById('prevBtn').addEventListener('click', goPrev);
@@ -53,12 +90,33 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'ArrowLeft') goPrev();
   });
 
+  // Touch swipe fallback for book stage
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  bookEl.addEventListener('touchstart', function (e) {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+
+  bookEl.addEventListener('touchend', function (e) {
+    touchEndX = e.changedTouches[0].screenX;
+    const diff = touchEndX - touchStartX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        goPrev(); // Swiped right -> go back
+      } else {
+        goNext(); // Swiped left -> go forward
+      }
+    }
+  }, { passive: true });
+
   // Re-check size on orientation change / resize so the book re-fits
   let resizeTimer;
   window.addEventListener('resize', function () {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       pageFlip.updateFromHTML(pages);
+      updateIndicator();
     }, 200);
   });
 });
